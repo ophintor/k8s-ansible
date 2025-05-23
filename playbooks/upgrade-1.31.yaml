@@ -1,0 +1,44 @@
+---
+- name: Upgrade Kubernetes to v1.31.0
+  hosts: korea
+  become: yes
+  tasks:
+
+    - name: Unhold kubeadm (if held)
+      shell: apt-mark unhold kubeadm || true
+
+    - name: Add Kubernetes APT key
+      get_url:
+        url: https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key
+        dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+        mode: '0644'
+
+    - name: Add Kubernetes APT repository
+      apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /"
+        state: present
+        filename: kubernetes
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install/Upgrade kubeadm to 1.31.0
+      shell: apt-get install -y --allow-change-held-packages kubeadm=1.31.0-1.1
+
+    - name: Run kubeadm upgrade
+      shell: kubeadm upgrade apply v1.31.0 -y
+
+    - name: Unhold kubelet and kubectl (if held)
+      shell: |
+        apt-mark unhold kubelet || true
+        apt-mark unhold kubectl || true
+
+    - name: Install/Upgrade kubelet and kubectl to 1.31.0
+      shell: apt-get install -y --allow-change-held-packages kubelet=1.31.0-1.1 kubectl=1.31.0-1.1
+
+    - name: Restart kubelet
+      systemd:
+        name: kubelet
+        state: restarted
+        enabled: yes
